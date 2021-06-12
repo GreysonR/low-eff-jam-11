@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>low eff black hole</title>
+	
+	<link rel="preconnect" href="https://fonts.gstatic.com">
+	<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@600&display=swap" rel="stylesheet">
+</head>
+<body style="margin: 0; background: #222; overflow: hidden;">
+	<div id="tempText" style="position: absolute; top: 20%; left: 50%; transform: translate(-50%, -50%); text-align: center; color: white; font-family: 'Exo 2', sans-serif; font-weight: bold; font-size: 30px;user-select:none;">Click/hold to add planets</div>
+	<div id="title" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -20px); text-align: center; color: white; font-family: 'Exo 2', sans-serif; font-weight: bold; font-size: 50px; display: none;user-select:none;">blackhole.</div>
+	<canvas id="canv" style="position: absolute; top: 0; left: 0; z-index: -1;"></canvas>
+</body>
+<script src="engine.js"></script>
+<script>
+	(function(){var script=document.createElement('script');script.onload=function(){var stats=new Stats();stats.dom.style.transform="translate(10px,10px)";document.body.appendChild(stats.dom);requestAnimationFrame(function loop(){stats.update();requestAnimationFrame(loop)});};script.src='//mrdoob.github.io/stats.js/build/stats.min.js';document.head.appendChild(script);})()
+	"use strict";
+	// 
+	// init
+	//
+	const { Render, Vector, Bodies, Lights, World, Collision, Common } = phys;
+	const camera = Render.camera;
+
+	canv.width = window.innerWidth;
+	canv.height = window.innerHeight;
+
+	Render.position = { x: 0, y: 0 };
+	Render.FoV = 1000;
+	Render.postRenderLights = true;
+	World.gravity.y = 0;
+
+	window.addEventListener("resize", event => {
+		canv.width = window.innerWidth;
+		canv.height = window.innerHeight;
+	});
+
+	//
+	// bodies
+	//
+	let blackhole = Lights.create(0, 0, {
+		size: 15,
+		background: "#0a0a0a",
+	});
+
+	function addPlanet(x, y) {
+		const FoV = phys.Render.camera.fov;
+		const cameraPosition = phys.Render.camera.position;
+		const canvWidth = canvas.width;
+		const canvHeight = canvas.height;
+		const boundSize = (canvWidth + canvHeight) / 2;
+
+		const translation = Render.camera.translation;
+		const scale = Render.camera.scale;
+
+		let pos = { x: (x - translation.x) / scale, y: (y - translation.y) / scale };
+		let force = (Math.random() * 4 + 3) * (Math.random() < 0.5 ? -1 : 1);
+		let angle = Math.atan2(pos.y, pos.x) + Math.PI/2;
+
+		Bodies.circle(10, pos.x, pos.y, {
+			frictionAir: 0,
+			render: {
+				border: "transparent",
+				background: "#E74C3C",
+			}
+		}).applyForce({ x: Math.cos(angle) * force, y: Math.sin(angle) * force });
+	}
+
+	window.addEventListener("mousedown", (event) => {
+		let startTime = Date.now();
+		let mousePos = { x: event.clientX, y: event.clientY };
+
+		addPlanet(mousePos.x, mousePos.y);
+
+		document.getElementById("tempText").style.display = "none";
+
+		let interval = setInterval(() => {
+			if (Date.now() - startTime > 150) {
+				addPlanet(mousePos.x, mousePos.y);
+			}
+		}, 30);
+
+		function move(event) {
+			mousePos.x = event.clientX;
+			mousePos.y = event.clientY;
+		}
+		function cancel() {
+			window.removeEventListener("mousemove", move);
+			window.removeEventListener("mouseup", cancel);
+			clearInterval(interval);
+		}
+		window.addEventListener("mousemove", move);
+		window.addEventListener("mouseup", cancel);
+	});
+	
+
+	//
+	// realtime
+	//
+	let lastTime = Date.now();
+	let fps = 60;
+	let frame = 0;
+	function getFps(curTime) {
+		let fps = 1000 / (curTime - lastTime);
+		lastTime = curTime;
+		return fps;
+	}
+
+	function mainLoop() {
+		frame++;
+
+		let curTime = Date.now();
+		fps = getFps(curTime);
+
+		Collision.test();
+		Render();
+
+		// Gravity
+		for (let i = 0; i < World.bodies.length; i++) {
+			let body = World.bodies[i];
+			let d = Math.sqrt(body.position.x ** 2 + body.position.y ** 2);
+			let v = 1000 / d**1.5;
+			let n = Vector.normalize({ x: body.position.x, y: body.position.y });
+
+			if (d < blackhole.size + (body.radius ?? 10))  {
+				body.delete();
+				blackhole.size += Math.max(1, blackhole.size * 0.01);
+
+				let title = document.getElementById("title");
+				if (blackhole.size > 1400 && title.style.display != "inline") {
+					title.style.display = "inline";
+
+
+					setTimeout(() => {
+						title.innerHTML += "<br><span style='font-size: 15px;'>it's really big isn't it</span>";
+						setTimeout(() => {
+							title.innerHTML += "<br><span style='font-size: 10px;'>;)</span>";
+						}, 2000);
+					}, 5000);
+				}
+			}
+
+			body.applyForce({ x: -n.x * v * World.timescale, y: -n.y * v * World.timescale });
+		}
+		
+		requestAnimationFrame(mainLoop);
+	}
+	requestAnimationFrame(mainLoop);
+</script>
+</html>

@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Low eff</title>
+</head>
+<body style="margin: 0; background: #222; overflow: hidden;">
+	<canvas id="canv" style="position: absolute; top: 0; left: 0;"></canvas>
+</body>
+
+<script src="engine.js"></script>
+<script>
+	"use strict";
+	// 
+	// init
+	//
+	const { Render, Vector, Bodies, Lights, World, Collision, Common } = phys;
+	const camera = Render.camera;
+
+	canv.width = window.innerWidth;
+	canv.height = window.innerHeight;
+
+	Render.position = { x: 0, y: 0 };
+	Render.camera.fov = 5000;
+	World.gravity.y = 1;
+
+	window.addEventListener("resize", event => {
+		canv.width = window.innerWidth;
+		canv.height = window.innerHeight;
+	});
+
+	//
+	// bodies
+	//
+	let player = Bodies.rectangle(100, 100, 0, 0, {
+		left: false,
+		right: false,
+		speed: 0.7,
+
+		jump: false,
+		canJump: true,
+		jumpHeight: 28,
+		jumpStart: 0,
+
+		frictionAir: 0,
+		restitution: 0,
+
+		render: {
+			border: "transparent",
+			background: "#12F24A",
+		},
+	});
+	player.on("collision", (body, collision) => {
+		if (Date.now() - player.jumpStart >= 10) {
+			let edge = collision.body1 === player ? collision.edge1[0] : collision.edge2[0];
+			if (player.canJump === false && Math.abs(edge.y) >= 10) {
+				player.canJump = true;
+			}
+		}
+	});
+
+	Bodies.rectangle(6000, 100, 0, 500, {
+		isStatic: true,
+		// ignoreLights: true,
+		render: {
+			border: "#DDDDDD",
+			background: "#DDDDDD",
+		}
+	});
+	// Bodies.rectangle(250, 20, 200, 440, {
+	// 	isStatic: true,
+	// 	render: {
+	// 		border: "transparent",
+	// 		background: "#DDDDDD",
+	// 	}
+	// });
+	let box = Bodies.rectangle(200, 200, 200, 300, {
+		isStatic: false,
+		// ignoreLights: true,
+		render: {
+			border: "transparent",
+			background: "orange",
+		}
+	});
+
+	let light = Lights.create(100, -900, {
+		size: 50,
+		background: "white",
+	});
+	Bodies.circle(100, -350, 100, {
+		isStatic: true,
+		// ignoreLights: true,
+		render: {
+			background: "#E74C3C",
+			border: "transparent",
+		}
+	});
+
+
+
+	//
+	// events
+	//
+	window.addEventListener("keydown", event => {
+		let key = event.key;
+		if (key === "a" || key === "ArrowLeft") {
+			player.left = true;
+		}
+		if (key === "d" || key === "ArrowRight") {
+			player.right = true;
+		}
+		if (key === "w" || key === "ArrowUp" || key === " ") {
+			if (player.canJump && player.lastCollisions.length > 0) {
+				player.jump = true;
+				player.canJump = false;
+				player.jumpStart = Date.now();
+			};
+		}
+	});
+	window.addEventListener("keyup", event => {
+		let key = event.key;
+		if (key === "a" || key === "ArrowLeft") {
+			player.left = false;
+		}
+		if (key === "d" || key === "ArrowRight") {
+			player.right = false;
+		}
+		if (key === "w" || key === "ArrowUp") {
+			player.jump = false;
+		}
+	});
+
+
+	//
+	// realtime
+	//
+	let lastTime = Date.now();
+	let fps = 60;
+	let frame = 0;
+	function getFps(curTime) {
+		let fps = 1000 / (curTime - lastTime);
+		lastTime = curTime;
+		return fps;
+	}
+
+	function mainLoop() {
+		frame++;
+
+		let curTime = Date.now();
+		fps = getFps(curTime);
+
+		Collision.test();
+		Render();
+		
+		requestAnimationFrame(mainLoop);
+
+		player.applyForce({ x: (player.right - player.left) * player.speed, y: -player.jump * player.jumpHeight });
+		player.velocity.x *= 0.95;
+		player.velocity.y *= 0.99;
+
+		if (player.jump) {
+			player.jump = false;
+		}
+
+		if (player.position.x > camera.position.x + 100) {
+			camera.position.x = player.position.x - 100;
+		}
+		if (player.position.x < camera.position.x - 100) {
+			camera.position.x = player.position.x + 100;
+		}
+	}
+	requestAnimationFrame(mainLoop);
+
+	Collision.on("beforeUpdate", () => {
+		if (player.velocity.y > 15) {
+			player.velocity.y = 15;
+		}
+	});
+</script>
+</html>
